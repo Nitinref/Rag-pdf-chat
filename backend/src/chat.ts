@@ -2,7 +2,7 @@ import 'dotenv/config';
 // @ts-ignore
 import express from 'express';
 // @ts-ignore
-import cors from 'cors'; // Import the cors middleware
+import cors from 'cors';
 // @ts-ignore
 import { OpenAIEmbeddings } from "@langchain/openai";
 // @ts-ignore
@@ -10,35 +10,28 @@ import { QdrantVectorStore } from "@langchain/qdrant";
 // @ts-ignore
 import { OpenAI } from "openai";
 
-// --- Basic Setup ---
+
 const app = express();
 const port = process.env.PORT || 3002;
 const client = new OpenAI();
 
-// --- Middleware ---
 
-// 1. Enable CORS for all routes
-// This will allow your frontend (e.g., http://localhost:5173) to communicate with this server.
+
+
 app.use(cors()); 
 
-// 2. This allows the server to understand JSON in the body of requests
 app.use(express.json());
 
-// --- Core Chat Logic ---
-/**
- * Handles the chat request by retrieving context and generating a response.
- * @param {string} userQuery - The query from the user.
- * @returns {Promise<string | null>} The AI-generated response or null on error.
- */
+
 async function getChatResponse(userQuery: string): Promise<string | null> {
     try {
-        // 1. --- Initialize Embeddings ---
+      
         const embeddings = new OpenAIEmbeddings({
             model: 'text-embedding-3-large',
     
         });
 
-        // 2. --- Connect to Qdrant Vector Store ---
+       
         const vectorStore = await QdrantVectorStore.fromExistingCollection(
             embeddings, {
                 url: process.env.QDRANT_URL || 'http://localhost:6333',
@@ -46,16 +39,15 @@ async function getChatResponse(userQuery: string): Promise<string | null> {
             }
         );
 
-        // 3. --- Create a Retriever ---
+       
         const vectorSearcher = vectorStore.asRetriever({
-            k: 3, // Number of relevant chunks to retrieve
+            k: 3,
         });
 
-        // 4. --- Retrieve Relevant Chunks ---
         const relevantChunks = await vectorSearcher.invoke(userQuery);
         console.log("Retrieved Chunks:", JSON.stringify(relevantChunks, null, 2));
 
-        // 5. --- Construct the System Prompt ---
+      
         const SYSTEM_PROMPT = `
             You are an AI assistant who helps resolving user query based on the 
             context available to you from a PDF file with the content and page number.
@@ -67,7 +59,7 @@ async function getChatResponse(userQuery: string): Promise<string | null> {
             ${JSON.stringify(relevantChunks)}
         `;
 
-        // 6. --- Call OpenAI Chat Completions API ---
+   
         const response = await client.chat.completions.create({
             model: 'gpt-4',
             messages: [{
@@ -79,7 +71,7 @@ async function getChatResponse(userQuery: string): Promise<string | null> {
             }, ],
         });
 
-        // 7. --- Return the AI's Message ---
+    
         return response.choices[0]?.message?.content ?? "Sorry, I couldn't generate a response.";
 
     } catch (error) {
